@@ -69,6 +69,19 @@ func (m *M) handleMsg(msg string, conn *net.Conn) {
 		m.quit = true
 		m.listener.Close()
 	}
+
+	if len(msg) > share.MSG_FOCUS_LEN && msg[:share.MSG_FOCUS_LEN] == share.MSG_FOCUS {
+		pID := msg[share.MSG_FOCUS_LEN+1:]
+		if _, ok := m.players[pID]; ok {
+			m.focusPlayer(pID)
+
+			(*conn).Write([]byte("ok"))
+		} else {
+			(*conn).Write([]byte("incorrect id, id is not in players"))
+		}
+
+		m.writeToListeners()
+	}
 }
 
 func (m *M) handleConn(conn net.Conn) {
@@ -157,12 +170,7 @@ func (m *M) dbusListener() {
 
 		m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant))
 
-		if len(m.listeningConns) != 0 {
-			json := m.getPlayersJson()
-			for _, conn := range m.listeningConns {
-				(*conn).Write(append(getUint16Bytes(uint16(len(json))), []byte(json)...))
-			}
-		}
+		m.writeToListeners()
 
 		/*
 			BODY:

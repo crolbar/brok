@@ -112,6 +112,15 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
 	}
 }
 
+func (m *M) writeToListeners() {
+	if len(m.listeningConns) != 0 {
+		json := m.getPlayersJson()
+		for _, conn := range m.listeningConns {
+			(*conn).Write(append(getUint16Bytes(uint16(len(json))), []byte(json)...))
+		}
+	}
+}
+
 func (m *M) next(pIDX int) {
 	pID := m.playersOrder[pIDX]
 

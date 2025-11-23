@@ -24,6 +24,25 @@ func (m *M) sendMsg(msg string) {
 	}
 }
 
+func (m *M) sendFocusMsg(id string) {
+	if len(share.MSG_FOCUS)+len(id) > share.MAX_MSG_LEN-4 {
+		panic("msg len")
+	}
+
+	_, err := m.conn.Write([]byte("msg:" + share.MSG_FOCUS + ":" + id))
+	if err != nil {
+		panic(err)
+	}
+
+	buf := make([]byte, share.MAX_MSG_LEN)
+	n, err := m.conn.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(buf[:n]))
+}
+
 func (m *M) listener() {
 	for {
 		headerBuf := make([]byte, 2)
@@ -62,7 +81,7 @@ func main() {
 	m := M{conn: conn}
 
 	noArgs := true
-	for _, arg := range os.Args {
+	for i, arg := range os.Args {
 		switch arg {
 		case "next", "--next":
 			m.sendMsg(share.MSG_NEXT)
@@ -71,6 +90,14 @@ func main() {
 		case "play-pause", "--play-pause":
 			m.sendMsg(share.MSG_PLAY_PAUSE)
 
+		case "focus", "--focus":
+
+			if len(os.Args) <= i+1 {
+				fmt.Println("no arg provided to focus")
+				return
+			}
+
+			m.sendFocusMsg(os.Args[i+1])
 		case "sub", "subscribe", "--subscribe":
 			m.sendMsg(share.MSG_SUB)
 			m.listener()
