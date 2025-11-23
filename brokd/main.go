@@ -11,8 +11,6 @@ import (
 )
 
 const (
-	sockPath = "/tmp/brokd.sock"
-
 	artUriKey = "mpris:artUrl: <"
 	artistKey = "xesam:artist: <"
 	titleKey  = "xesam:title: <"
@@ -40,6 +38,8 @@ type Player struct {
 type M struct {
 	dbusConn *dbus.Conn
 
+	listeningConns []*net.Conn
+
 	// key == player.id
 	players map[string]*Player
 	// playersOrder[0] is the focused player, 1, 2 are in order below it
@@ -53,10 +53,13 @@ type M struct {
 	quit bool
 }
 
-func (m *M) handleMsg(msg string) {
+func (m *M) handleMsg(msg string, conn *net.Conn) {
 	switch msg {
 	case share.MSG_NEXT:
 		fmt.Println("msg next")
+
+	case share.MSG_SUB:
+		m.listeningConns = append(m.listeningConns, conn)
 
 	case "quit":
 		m.quit = true
@@ -65,6 +68,15 @@ func (m *M) handleMsg(msg string) {
 }
 
 func (m *M) handleConn(conn net.Conn) {
+	defer func() {
+		conn.Close()
+		for i, c := range m.listeningConns {
+			if c != &conn {
+				continue
+			}
+			m.listeningConns = append(m.listeningConns[:i], m.listeningConns[i+1:]...)
+		}
+	}()
 	for {
 		buf := make([]byte, share.MAX_MSG_LEN)
 		n, err := conn.Read(buf)
@@ -78,10 +90,8 @@ func (m *M) handleConn(conn net.Conn) {
 
 		data := buf[:n]
 
-		fmt.Println("red: " + string(data))
-
 		if strings.HasPrefix(string(data), "msg:") {
-			m.handleMsg(string(data[4:]))
+			m.handleMsg(string(data[4:]), &conn)
 		}
 	}
 }
@@ -150,8 +160,12 @@ func (m *M) dbusListener() {
 
 		m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant))
 
-		// m.printPlayers()
-		// fmt.Println(m.getPlayersJson())
+		if len(m.listeningConns) != 0 {
+			json := m.getPlayersJson()
+			for _, conn := range m.listeningConns {
+				(*conn).Write(append(getUint16Bytes(uint16(len(json))), []byte(json)...))
+			}
+		}
 
 		/*
 			BODY:
@@ -166,9 +180,9 @@ func (m *M) dbusListener() {
 }
 
 func main() {
-	if _, err := os.Stat(sockPath); err == nil {
+	if _, err := os.Stat(share.SockPath); err == nil {
 		fmt.Println("\x1b[33mremoving old socket\x1b[m")
-		err = os.Remove(sockPath)
+		err = os.Remove(share.SockPath)
 
 		if err != nil {
 			panic(err)
@@ -182,18 +196,19 @@ func main() {
 	defer conn.Close()
 	fmt.Println("\x1b[34mConnected to dbus\x1b[m")
 
-	listener, err := net.Listen("unix", sockPath)
+	listener, err := net.Listen("unix", share.SockPath)
 	if err != nil {
 		panic(err)
 	}
 	defer listener.Close()
-	fmt.Printf("\x1b[34mConnected to unix socket at %s\x1b[m\n", sockPath)
+	fmt.Printf("\x1b[34mConnected to unix socket at %s\x1b[m\n", share.SockPath)
 
 	m := M{
-		quit:          false,
-		listener:      listener,
-		dbusConn:      conn,
-		playersIDsMap: make(map[string]string),
+		quit:           false,
+		listener:       listener,
+		dbusConn:       conn,
+		playersIDsMap:  make(map[string]string),
+		listeningConns: make([]*net.Conn, 0),
 
 		playersOrder: nil,
 		players:      nil,

@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"encoding/binary"
+	"strings"
+)
 
 func getMetadataVal(key string, metadata string) string {
 	var (
@@ -19,4 +22,10 @@ func getMetadataVal(key string, metadata string) string {
 	}
 
 	return val
+}
+
+func getUint16Bytes(i uint16) []byte {
+	size := make([]byte, 2)
+	binary.LittleEndian.PutUint16(size, i)
+	return size
 }
