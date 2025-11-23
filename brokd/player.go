@@ -97,6 +97,8 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
 			switch value {
 			case "Playing":
 				player.status = Playing
+			case "Stopped":
+				fallthrough
 			case "Paused":
 				player.status = Paused
 			}
@@ -107,5 +109,47 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
 			player.title = getMetadataVal(titleKey, value)
 			player.artist = getMetadataVal(artistKey, value)
 		}
+	}
+}
+
+func (m *M) next(pIDX int) {
+	pID := m.playersOrder[pIDX]
+
+	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
+	call := obj.Call("org.mpris.MediaPlayer2.Player.Next", 0)
+	if call.Err != nil {
+		panic(call.Err)
+	}
+
+	if pIDX != 0 {
+		m.focusPlayer(pID)
+	}
+}
+
+func (m *M) prev(pIDX int) {
+	pID := m.playersOrder[pIDX]
+
+	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
+	call := obj.Call("org.mpris.MediaPlayer2.Player.Previous", 0)
+	if call.Err != nil {
+		panic(call.Err)
+	}
+
+	if pIDX != 0 {
+		m.focusPlayer(pID)
+	}
+}
+
+func (m *M) playPause(pIDX int) {
+	pID := m.playersOrder[pIDX]
+
+	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
+	call := obj.Call("org.mpris.MediaPlayer2.Player.PlayPause", 0)
+	if call.Err != nil {
+		panic(call.Err)
+	}
+
+	if pIDX != 0 {
+		m.focusPlayer(pID)
 	}
 }

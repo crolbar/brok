@@ -6,5 +6,7 @@ const (
 	SockPath = "/tmp/brokd.sock"
 
 	MSG_NEXT = "next"
+	MSG_PREV = "prev"
+	MSG_PLAY_PAUSE = "playpause"
 	MSG_SUB = "sub"
 )

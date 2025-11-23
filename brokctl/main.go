@@ -64,11 +64,17 @@ func main() {
 	noArgs := true
 	for _, arg := range os.Args {
 		switch arg {
-		case "next":
+		case "next", "--next":
 			m.sendMsg(share.MSG_NEXT)
+		case "prev", "--prev", "previous", "--previous":
+			m.sendMsg(share.MSG_PREV)
+		case "play-pause", "--play-pause":
+			m.sendMsg(share.MSG_PLAY_PAUSE)
+
 		case "sub", "subscribe", "--subscribe":
 			m.sendMsg(share.MSG_SUB)
 			m.listener()
+
 		case "quit":
 			m.sendMsg("quit")
 		default:

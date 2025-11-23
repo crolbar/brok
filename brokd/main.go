@@ -56,7 +56,11 @@ type M struct {
 func (m *M) handleMsg(msg string, conn *net.Conn) {
 	switch msg {
 	case share.MSG_NEXT:
-		fmt.Println("msg next")
+		m.next(0)
+	case share.MSG_PREV:
+		m.prev(0)
+	case share.MSG_PLAY_PAUSE:
+		m.playPause(0)
 
 	case share.MSG_SUB:
 		m.listeningConns = append(m.listeningConns, conn)
@@ -95,13 +99,6 @@ func (m *M) handleConn(conn net.Conn) {
 		}
 	}
 }
-
-// player := players[0]
-// obj := conn.Object(player, "/org/mpris/MediaPlayer2")
-// call := obj.Call("org.mpris.MediaPlayer2.Player.PlayPause", 0)
-// if call.Err != nil {
-// 	log.Fatal(call.Err)
-// }
 
 func (m *M) dbusListener() {
 	call := m.dbusConn.BusObject().Call(
