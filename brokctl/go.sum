@@ -1,4 +1,2 @@
 github.com/crolbar/brok/share v0.0.0-20251123201038-e0846ea7526b h1:tf8fiYhXY09+UQ/rLAftwl9/yLy0BOBz90WL+l5emjM=
 github.com/crolbar/brok/share v0.0.0-20251123201038-e0846ea7526b/go.mod h1:vaBCznc6Mr3wKq4mFfNjBx2oC11YOxhiVayXx6t/Ze0=
-github.com/godbus/dbus v4.1.0+incompatible h1:WqqLRTsQic3apZUK9qC5sGNfXthmPXzUZ7nQPrNITa4=
-github.com/godbus/dbus v4.1.0+incompatible/go.mod h1:/YcGZj5zSblfDWMMoOzV4fas9FZnQYTkDnsGvmh2Grw=

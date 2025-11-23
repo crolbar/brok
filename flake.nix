@@ -16,15 +16,19 @@
         pname = "brokd";
         version = "v0.1";
         src = ./brokd;
-        vendorHash = null;
+        vendorHash = "sha256-NI9qQl9JijdBwp7JcsqNSIawWIr3OyPMWpifv7bn60c=";
       };
 
       brokctl = pkgs.buildGoModule {
         pname = "brokctl";
         version = "v0.1";
         src = ./brokctl;
-        vendorHash = null;
+        vendorHash = "sha256-POZ55bkRkli0/DxIvPagOmTgBaxwerYA1Lv0nOrYqNM=";
       };
+    };
+
+    homeManagerModules = {
+      default = import ./module.nix inputs;
     };
   };
 }
