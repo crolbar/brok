@@ -127,7 +127,7 @@ func (m *M) next(pIDX int) {
 	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
 	call := obj.Call("org.mpris.MediaPlayer2.Player.Next", 0)
 	if call.Err != nil {
-		panic(call.Err)
+		fmt.Println(call.Err)
 	}
 
 	if pIDX != 0 {
@@ -141,7 +141,7 @@ func (m *M) prev(pIDX int) {
 	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
 	call := obj.Call("org.mpris.MediaPlayer2.Player.Previous", 0)
 	if call.Err != nil {
-		panic(call.Err)
+		fmt.Println(call.Err)
 	}
 
 	if pIDX != 0 {
@@ -155,7 +155,7 @@ func (m *M) playPause(pIDX int) {
 	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
 	call := obj.Call("org.mpris.MediaPlayer2.Player.PlayPause", 0)
 	if call.Err != nil {
-		panic(call.Err)
+		fmt.Println(call.Err)
 	}
 
 	if pIDX != 0 {
