@@ -76,7 +76,7 @@ func (m *M) getPlayersJson() string {
 	return sb.String()
 }
 
-func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
+func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) bool {
 	player := m.players[pID]
 
 	if len(player.name) == 0 {
@@ -89,6 +89,7 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
 		}
 	}
 
+	haveUpdate := false
 	for k, v := range props {
 		event := strings.ReplaceAll(k, "\"", "")
 		value := strings.ReplaceAll(v.String(), "\"", "")
@@ -102,14 +103,19 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) {
 			case "Paused":
 				player.status = Paused
 			}
+
+			haveUpdate = true
 		}
 
 		if event == "Metadata" {
 			player.artUri = getMetadataVal(artUriKey, value)
 			player.title = getMetadataVal(titleKey, value)
 			player.artist = getMetadataVal(artistKey, value)
+			haveUpdate = true
 		}
 	}
+
+	return haveUpdate
 }
 
 func (m *M) writeToListeners() {

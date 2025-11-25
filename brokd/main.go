@@ -168,9 +168,9 @@ func (m *M) dbusListener() {
 		// on any action from this player, focus it
 		m.focusPlayer(sender)
 
-		m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant))
-
-		m.writeToListeners()
+		if up := m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant)); up {
+			m.writeToListeners()
+		}
 
 		/*
 			BODY:
