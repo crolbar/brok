@@ -135,6 +135,10 @@ func (m *M) dbusListener() {
 	for !m.quit {
 		sig := <-sig_ch
 
+		if sig == nil {
+			continue
+		}
+
 		if sig.Name == "org.freedesktop.DBus.NameOwnerChanged" {
 			m.handleNameOwnerChanged(sig.Body[0].(string))
 			continue
