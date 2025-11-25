@@ -76,6 +76,15 @@ func (m *M) getPlayersJson() string {
 	return sb.String()
 }
 
+func upIfNE[T string | int](curr *T, new T, up *bool) {
+	if *curr == new {
+		return
+	}
+
+	*curr = new
+	*up = true
+}
+
 func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) bool {
 	player := m.players[pID]
 
@@ -97,21 +106,19 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) bool {
 		if event == "PlaybackStatus" {
 			switch value {
 			case "Playing":
-				player.status = Playing
+				// player.status = Playing
+				upIfNE(&player.status, Playing, &haveUpdate)
 			case "Stopped":
 				fallthrough
 			case "Paused":
-				player.status = Paused
+				upIfNE(&player.status, Paused, &haveUpdate)
 			}
-
-			haveUpdate = true
 		}
 
 		if event == "Metadata" {
-			player.artUri = getMetadataVal(artUriKey, value)
-			player.title = getMetadataVal(titleKey, value)
-			player.artist = getMetadataVal(artistKey, value)
-			haveUpdate = true
+			upIfNE(&player.artUri, getMetadataVal(artUriKey, value), &haveUpdate)
+			upIfNE(&player.title, getMetadataVal(titleKey, value), &haveUpdate)
+			upIfNE(&player.artist, getMetadataVal(artistKey, value), &haveUpdate)
 		}
 	}
 
