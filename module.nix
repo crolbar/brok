@@ -24,16 +24,14 @@ in {
       optional (cfg.package != null) pkgBin;
 
     systemd.user.services.brokd = {
-      Unit = {
-        Description = "brokd";
-        After = ["graphical-session.target"];
-        PartOf = ["graphical-session.target"];
-      };
+      Unit.Description = "brokd";
+
+      Install.WantedBy = ["default.target"];
+
       Service = {
         ExecStart = "${lib.getExe' cfg.package "brokd"}";
         Restart = "on-failure";
       };
-      Install.WantedBy = ["graphical-session.target"];
     };
   };
 }
