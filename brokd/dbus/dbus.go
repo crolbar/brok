@@ -79,7 +79,46 @@ type header struct {
 	Variant
 }
 
+func pad(b *bytes.Buffer, align int) {
+	for b.Len()%align != 0 {
+		b.WriteByte(0)
+	}
+}
+
+func writeHeader(buf *bytes.Buffer, h header) {
+	pad(buf, 8)
+
+	// FIELD
+	buf.WriteByte(h.Field)
+
+	// SIG
+	buf.WriteByte(byte(len(h.sig.str))) // len of sig
+	b := make([]byte, len(h.sig.str)+1)
+	copy(b, h.sig.str)
+	b[len(b)-1] = 0 // null terminate sig
+	buf.Write(b)
+
+	// VALUE
+	switch v := h.value.(type) {
+	case string:
+		binary.Write(buf, binary.LittleEndian, uint32(len(v)))
+		b := make([]byte, len(v)+1)
+		copy(b, v)
+		b[len(b)-1] = 0
+		buf.Write(b)
+	default:
+		panic("header value type not supported")
+	}
+}
+
 func call(C net.Conn, method string, body ...string) {
+	iface := ""
+	i := strings.LastIndex(method, ".")
+	if i != -1 {
+		iface = method[:i]
+	}
+	method = method[i+1:]
+
 	var (
 		b  bytes.Buffer
 		bw = func(data any) {
@@ -91,7 +130,11 @@ func call(C net.Conn, method string, body ...string) {
 			{Field: byte(FieldDestination), Variant: Variant{value: dest, sig: Signature{str: "s"}}},
 
 			{Field: byte(FieldMember), Variant: Variant{value: method, sig: Signature{str: "s"}}},
+			{Field: byte(FieldInterface), Variant: Variant{value: iface, sig: Signature{str: "s"}}},
 		}
+
+		// we need the len of the headers in bytes, this is the easiest way
+		headersBuf bytes.Buffer
 	)
 
 	b.WriteByte('l')      // little edian
@@ -102,13 +145,27 @@ func call(C net.Conn, method string, body ...string) {
 	bw(uint32(serial))
 	serial += 1
 
+	for _, header := range headers {
+		writeHeader(&headersBuf, header)
+	}
+
+	bw(uint32(headersBuf.Len()))
+	pad(&b, 8)
+	b.Write(headersBuf.Bytes())
+	pad(&b, 8)
+
+	fmt.Println("%q", b.Bytes())
 	_, err := b.WriteTo(C)
 	if err != nil {
 		panic(err)
 	}
-	bb := make([]byte, 2)
+
+	bb := make([]byte, 16)
 	fmt.Println("reading")
-	C.Read(bb)
+	_, err = C.Read(bb)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println(bb)
 }
 
