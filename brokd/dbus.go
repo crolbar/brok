@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 )
 
 func (m *M) handleNameOwnerChanged(player string) {
 	if !strings.HasPrefix(player, "org.mpris.MediaPlayer2") {
+		fmt.Println("skip")
 		return
 	}
 
@@ -25,10 +27,13 @@ func (m *M) handleNameOwnerChanged(player string) {
 func (m *M) getPlayerName(sender string) string {
 	for _, player := range m.playersOrder {
 		var owner string
+		fmt.Println("call with", player)
 		err := m.dbusConn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, player).Store(&owner)
 		if err != nil {
+			fmt.Println("err: ", err)
 			continue
 		}
+		fmt.Println("owner", player)
 
 		if owner == sender {
 			return player

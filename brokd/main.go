@@ -136,8 +136,14 @@ func (m *M) dbusListener() {
 		sig := <-sig_ch
 
 		if sig == nil {
-			continue
+			fmt.Println("nil recived")
+			return
+			// continue
 		}
+
+		fmt.Println("sig recived", sig)
+		fmt.Println("f", sig.Sender)
+
 
 		if sig.Name == "org.freedesktop.DBus.NameOwnerChanged" {
 			m.handleNameOwnerChanged(sig.Body[0].(string))
@@ -163,8 +169,6 @@ func (m *M) dbusListener() {
 			}
 		}
 
-		// fmt.Printf("\x1b[34m[%s]\x1b[m %s\n", sender, sig.Body)
-
 		if sender == "org.mpris.MediaPlayer2.playerctld" {
 			continue
 		}
@@ -173,6 +177,7 @@ func (m *M) dbusListener() {
 		m.focusPlayer(sender)
 
 		if up := m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant)); up {
+			fmt.Printf("\x1b[34m[%s]\x1b[m %s\n", sender, sig.Body)
 			m.writeToListeners()
 		}
 
