@@ -1,53 +1,25 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 )
 
 var (
-	serial int = 1
-
 	dest = "org.freedesktop.DBus"
 	path = "/org/freedesktop/DBus"
 )
 
-func authReadLine(C net.Conn) ([][]byte, error) {
-	in := bufio.NewReader(C)
+type Dbus struct {
+	C *net.UnixConn
 
-	msgBuf, err := in.ReadBytes('\n')
-	if err != nil {
-		return [][]byte{}, err
-	}
-
-	bytes.TrimSuffix(msgBuf, []byte("\r\n"))
-	return bytes.Split(msgBuf, []byte{' '}), nil
-}
-
-func authWriteLine(C net.Conn, cmds ...[]byte) error {
-	buf := make([]byte, 0)
-
-	for i, c := range cmds {
-		buf = append(buf, c...)
-		if i != len(cmds)-1 {
-			buf = append(buf, ' ')
-		}
-	}
-
-	buf = append(buf, '\r')
-	buf = append(buf, '\n')
-	n, err := C.Write(buf)
-	if n != len(buf) {
-		panic("write err n != len(buf)")
-	}
-	return err
+	serial   int
+	lastBody []byte
 }
 
 type HeaderField byte
@@ -65,6 +37,19 @@ const (
 	fieldMax
 )
 
+var headerMap = map[HeaderField]string{
+	0: "INVALID",
+	1: "PATH",
+	2: "INTERFACE",
+	3: "MEMBER",
+	4: "ERROR_NAME",
+	5: "REPLY_SERIAL",
+	6: "DESTINATION",
+	7: "SENDER",
+	8: "SIGNATURE",
+	9: "UNIX_FDS",
+}
+
 type Signature struct {
 	str string
 }
@@ -77,6 +62,51 @@ type Variant struct {
 type header struct {
 	Field byte
 	Variant
+}
+
+type Msg struct {
+	Type byte
+
+	headers []header
+	body    []byte
+}
+
+func (m Msg) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Msg: %d\n", m.Type))
+	sb.WriteString("headers:\n")
+	for _, h := range m.headers {
+		sb.WriteString("  [")
+		switch h.Field {
+		case byte(FieldPath):
+			sb.WriteString("FieldPath")
+		case byte(FieldInterface):
+			sb.WriteString("FieldInterface")
+		case byte(FieldMember):
+			sb.WriteString("FieldMember")
+		case byte(FieldErrorName):
+			sb.WriteString("FieldErrorName")
+		case byte(FieldReplySerial):
+			sb.WriteString("FieldReplySerial")
+		case byte(FieldDestination):
+			sb.WriteString("FieldDestination")
+		case byte(FieldSender):
+			sb.WriteString("FieldSender")
+		case byte(FieldSignature):
+			sb.WriteString("FieldSignature")
+		case byte(FieldUnixFDs):
+			sb.WriteString("FieldUnixFDs")
+		}
+		sb.WriteString(", ")
+		sb.WriteString(fmt.Sprintf("%q", h.value))
+		sb.WriteString(fmt.Sprintf("%s", h.sig))
+		sb.WriteString("]\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("body: %s", string(m.body)))
+
+	return sb.String()
 }
 
 func pad(b *bytes.Buffer, align int) {
@@ -111,7 +141,7 @@ func writeHeader(buf *bytes.Buffer, h header) {
 	}
 }
 
-func call(C net.Conn, method string, body ...string) {
+func (d *Dbus) call(method string, path string, dest string, body ...string) {
 	iface := ""
 	i := strings.LastIndex(method, ".")
 	if i != -1 {
@@ -142,8 +172,8 @@ func call(C net.Conn, method string, body ...string) {
 	b.WriteByte(0)        // no flags
 	b.WriteByte(1)        // protocol version
 	bw(uint32(len(body))) // body size
-	bw(uint32(serial))
-	serial += 1
+	bw(uint32(d.serial))
+	d.serial += 1
 
 	for _, header := range headers {
 		writeHeader(&headersBuf, header)
@@ -154,19 +184,141 @@ func call(C net.Conn, method string, body ...string) {
 	b.Write(headersBuf.Bytes())
 	pad(&b, 8)
 
-	fmt.Println("%q", b.Bytes())
-	_, err := b.WriteTo(C)
+	_, err := b.WriteTo(d.C)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func readHeaders(buf []byte, order binary.ByteOrder, headers *[]header) {
+	if len(buf) == 0 {
+		return
+	}
+	// TODO: assuming we are at padding
+	if buf[0] == 0 {
+		return
+	}
+
+	var (
+		h header
+		i = 0
+	)
+
+	h.Field = buf[i]
+	i += 1
+
+	sigLen := buf[i]
+	i += 1
+
+	h.sig = Signature{str: string(buf[i : i+int(sigLen)])}
+	i += int(sigLen) + // sig
+		1 // null term
+
+	switch h.Field {
+
+	// uint32
+	case byte(FieldReplySerial), byte(FieldUnixFDs):
+		var v uint32
+		binary.Read(bytes.NewBuffer(buf[i:]), order, &v)
+		h.value = v
+		i += 4
+
+	// string
+	case byte(FieldSender),
+		byte(FieldInterface),
+		byte(FieldMember),
+		byte(FieldErrorName),
+		byte(FieldDestination),
+		byte(FieldPath):
+		var length uint32
+		binary.Read(bytes.NewBuffer(buf[i:]), order, &length)
+		i += 4
+
+		var v = make([]byte, length)
+		binary.Read(bytes.NewBuffer(buf[i:]), order, &v)
+		i += int(length) + 1
+		h.value = string(v)
+
+		// skip the padding
+		n := 4 + int(length) + 1
+		if n%4 != 0 {
+			i += 4 - (n % 4)
+		}
+
+	case byte(FieldSignature):
+		length := buf[i]
+		i += 1
+
+		v := buf[i : i+int(length)]
+		h.value = v
+		i += int(length) + 1
+	}
+
+	*headers = append(*headers, h)
+	readHeaders(buf[i:], order, headers)
+}
+
+func (d *Dbus) readMsg(fixedHeader [16]byte) Msg {
+	var (
+		order binary.ByteOrder
+
+		bodySize   uint32
+		headerSize uint32
+
+		headers []header
+	)
+
+	switch fixedHeader[0] {
+	case 'l':
+		order = binary.LittleEndian
+	case 'B':
+		order = binary.BigEndian
+	default:
+		panic("dbus invalid msg read from server")
+	}
+
+	binary.Read(bytes.NewBuffer(fixedHeader[4:8]), order, &bodySize)
+	binary.Read(bytes.NewBuffer(fixedHeader[12:]), order, &headerSize)
+
+	// header size field does not include the padding at the end, add it
+	if headerSize%8 != 0 {
+		headerSize += 8 - (headerSize % 8)
+	}
+
+	headersBuf := make([]byte, headerSize)
+	_, err := io.ReadFull(d.C, headersBuf)
+	if err != nil {
+		panic(err)
+	}
+	readHeaders(headersBuf, order, &headers)
+
+	body := make([]byte, bodySize)
+	_, err = io.ReadFull(d.C, body)
 	if err != nil {
 		panic(err)
 	}
 
-	bb := make([]byte, 16)
-	fmt.Println("reading")
-	_, err = C.Read(bb)
-	if err != nil {
-		panic(err)
+	return Msg{
+		Type:    fixedHeader[1],
+		headers: headers,
+		body:    body,
 	}
-	fmt.Println(bb)
+}
+
+func (d *Dbus) reader() {
+	for {
+		var fixedHeader [16]byte
+		_, err := io.ReadFull(d.C, fixedHeader[:])
+		if err != nil {
+			panic(err)
+		}
+		msg := d.readMsg(fixedHeader)
+		fmt.Println(msg)
+	}
+}
+
+func (d *Dbus) test() {
+	fmt.Println(string(d.lastBody))
 }
 
 func main() {
@@ -187,68 +339,20 @@ func main() {
 		panic(err)
 	}
 
-	{
-		// ucred := &syscall.Ucred{Pid: int32(os.Getpid()), Uid: uint32(os.Getuid()), Gid: uint32(os.Getgid())}
-		// b := syscall.UnixCredentials(ucred)
-		_, _, err := C.WriteMsgUnix([]byte{0}, []byte{}, nil)
-		if err != nil {
-			panic(err)
-		}
-	}
+	dbus := Dbus{C: C, serial: 1}
 
-	{
-		err := authWriteLine(C, []byte("AUTH"))
-		if err != nil {
-			panic(err)
-		}
-		cmds, err := authReadLine(C)
-		if err != nil {
-			panic(err)
-		}
-		if string(cmds[0]) != "REJECTED" && string(cmds[1]) != "EXTERNAL" {
-			panic("auth protocol error: expected REJECTED AND EXTERNAL")
-		}
-	}
-
-	{
-		uid := strconv.Itoa(os.Getuid())
-		b := make([]byte, 2*len(uid))
-		hex.Encode(b, []byte(uid))
-
-		authWriteLine(C, []byte("AUTH EXTERNAL"), b)
-
-		cmds, err := authReadLine(C)
-		if err != nil {
-			panic(err)
-		}
-		if !bytes.Equal(cmds[0], []byte("OK")) {
-			panic("dbus auth: status not OK")
-		}
-	}
-
-	// NOTE: NOT USED
-	// uuid := cmds[1]
-
-	err = authWriteLine(C, []byte("NEGOTIATE_UNIX_FD"))
+	err = dbus.Auth()
 	if err != nil {
 		panic(err)
 	}
-
-	cmds, err := authReadLine(C)
-	if bytes.Equal(cmds[0], []byte("ERROR")) {
-		panic("dbus auth: NEGOTION UNIX FD FAILED")
-	}
-
-	err = authWriteLine(C, []byte("BEGIN"))
-	if err != nil {
-		panic(err)
-	}
-
 	fmt.Println("connected")
 
-	call(C, "org.freedesktop.DBus.Hello")
+	go dbus.reader()
 
-	// fmt.Println("red: ", string(msgBuf))
+	dbus.call("org.freedesktop.DBus.Hello", path, dest)
+	// dbus.test()
+	// dbus.call("org.freedesktop.DBus.Peer.Ping")
+	// dbus.call("org.freedesktop.DBus.GetId")
 
 	select {}
 }

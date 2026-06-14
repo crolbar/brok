@@ -6,7 +6,10 @@
     pkgs = import inputs.nixpkgs {inherit system;};
   in {
     devShells.${system}.default = pkgs.mkShell {
-      packages = with pkgs; [];
+      packages = with pkgs; [
+        go
+        gopls
+      ];
     };
 
     packages.${system} = {
