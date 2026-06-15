@@ -33,7 +33,7 @@ func writeHeader(buf *bytes.Buffer, h header) {
 	}
 }
 
-func (d *Dbus) call(method string, path string, dest string, body ...string) {
+func (d *Dbus) call(method string, path string, dest string, body ...string) Msg {
 	iface := ""
 	i := strings.LastIndex(method, ".")
 	if i != -1 {
@@ -59,6 +59,8 @@ func (d *Dbus) call(method string, path string, dest string, body ...string) {
 		headersBuf bytes.Buffer
 
 		serial = d.getSerial()
+
+		reply chan Msg = make(chan Msg)
 	)
 
 	b.WriteByte('l')      // little edian
@@ -78,15 +80,20 @@ func (d *Dbus) call(method string, path string, dest string, body ...string) {
 	pad(&b, 8)
 
 	d.writeCh <- b.Bytes()
+
+	d.replyChMu.Lock()
+	d.replyChs[serial] = reply
+	d.replyChMu.Unlock()
+
+	return <-reply
 }
 
 func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Variant) {
 	if len(buf) == 0 {
 		return
 	}
-	// TODO: assuming we are at padding
 	if buf[0] == 0 {
-		return
+		panic("at 0")
 	}
 
 	var (
@@ -130,9 +137,8 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 		h.value = string(v)
 
 		// skip the padding
-		n := 4 + int(length) + 1
-		if n%4 != 0 {
-			i += 4 - (n % 4)
+		if i%8 != 0 {
+			i += 8 - (i % 8)
 		}
 
 	case FieldSignature:
@@ -142,6 +148,10 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 		v := buf[i : i+int(length)]
 		h.value = v
 		i += int(length) + 1
+
+		if i%8 != 0 {
+			i += 8 - (i % 8)
+		}
 	}
 
 	headers[h.Field] = h.Variant
@@ -189,7 +199,7 @@ func (d *Dbus) readMsg(fixedHeader [16]byte) Msg {
 	}
 
 	return Msg{
-		Type:    fixedHeader[1],
+		Type:    MsgType(fixedHeader[1]),
 		headers: headers,
 		body:    body,
 	}

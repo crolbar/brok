@@ -15,9 +15,9 @@ func (m Msg) String() string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Msg: %d\n", m.Type))
-	sb.WriteString("headers:\n")
+	sb.WriteString("  Headers:\n")
 	for k, v := range m.headers {
-		sb.WriteString("  [")
+		sb.WriteString("    [")
 		switch k {
 		case FieldPath:
 			sb.WriteString("FieldPath")
@@ -40,11 +40,11 @@ func (m Msg) String() string {
 		}
 		sb.WriteString(", ")
 		sb.WriteString(fmt.Sprintf("%q", v.value))
-		sb.WriteString(fmt.Sprintf("%s", v.sig))
+		// sb.WriteString(fmt.Sprintf("%s", v.sig))
 		sb.WriteString("]\n")
 	}
 
-	sb.WriteString(fmt.Sprintf("body: %s", string(m.body)))
+	sb.WriteString(fmt.Sprintf(" Body: %s", string(m.body)))
 
 	return sb.String()
 }

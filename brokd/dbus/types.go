@@ -15,6 +15,16 @@ const (
 	fieldMax
 )
 
+type MsgType byte
+
+const (
+	MSG_INVALID MsgType = 0 + iota
+	MSG_METHOD_CALL
+	MSG_METHOD_RETURN
+	MSG_ERROR
+	MSG_SIGNAL
+)
+
 var headerMap = map[HeaderField]string{
 	0: "INVALID",
 	1: "PATH",
@@ -43,7 +53,7 @@ type header struct {
 }
 
 type Msg struct {
-	Type byte
+	Type MsgType
 
 	headers map[HeaderField]Variant
 	body    []byte

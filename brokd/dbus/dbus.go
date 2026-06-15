@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 )
 
 var (
@@ -17,6 +18,10 @@ type Dbus struct {
 	C *net.UnixConn
 
 	writeCh chan []byte
+
+	replyChMu sync.Mutex
+	replyChs  map[int](chan Msg)
+
 	serial   int
 	lastBody []byte
 }
@@ -40,12 +45,21 @@ func (d *Dbus) reader() {
 			panic(err)
 		}
 		msg := d.readMsg(fixedHeader)
-		fmt.Println(msg)
-	}
-}
 
-func (d *Dbus) test() {
-	fmt.Println(string(d.lastBody))
+		// send the msg back to the reply chan
+		if _, ok := msg.headers[FieldReplySerial]; ok {
+			replySerial := int(msg.headers[FieldReplySerial].value.(uint32))
+
+			d.replyChMu.Lock()
+			replyCh := d.replyChs[replySerial]
+			d.replyChMu.Unlock()
+
+			replyCh <- msg
+		}
+
+		// fmt.Println(msg)
+		// fmt.Println()
+	}
 }
 
 func main() {
@@ -71,6 +85,8 @@ func main() {
 
 		writeCh: make(chan []byte),
 		serial:  1,
+
+		replyChs: make(map[int]chan Msg),
 	}
 
 	err = dbus.Auth()
@@ -82,10 +98,13 @@ func main() {
 	go dbus.reader()
 	go dbus.writer()
 
-	dbus.call("org.freedesktop.DBus.Hello", path, dest)
-	// dbus.test()
+	msg := dbus.call("org.freedesktop.DBus.Hello", path, dest)
+	fmt.Println("name", string(msg.body))
+	msg = dbus.call("org.mpris.MediaPlayer2.Player.PlayPause", "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.vivaldi.instance4043")
+	fmt.Println(msg)
 	// dbus.call("org.freedesktop.DBus.Peer.Ping")
 	// dbus.call("org.freedesktop.DBus.GetId")
 
+	fmt.Println("end")
 	select {}
 }
