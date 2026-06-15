@@ -1,6 +1,7 @@
-package main
+package dbus
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -10,15 +11,17 @@ import (
 )
 
 type Dbus struct {
-	C *net.UnixConn
+	C    *net.UnixConn
+	Name string
 
 	writeCh chan []byte
 
 	replyChMu sync.Mutex
 	replyChs  map[int](chan Msg)
 
-	serial   int
-	lastBody []byte
+	serial int
+
+	signalCh *chan Msg
 }
 
 func (d *Dbus) writer() {
@@ -54,27 +57,14 @@ func (d *Dbus) reader() {
 				replyCh <- msg
 			}
 		case MSG_SIGNAL:
-
-			// mpris update (sig sa{sv}as)
-			if msg.headers[FieldPath].value.(string) == "/org/mpris/MediaPlayer2" {
-				// fmt.Println(msg)
-				props := ParsePropertiesChanged(msg.body)
-
-				sender := msg.headers[FieldSender].value.(string)
-				fmt.Println(sender, props)
-			}
-			// client created/destoryed
-			if msg.headers[FieldPath].value.(string) == "/org/freedesktop/DBus" &&
-				msg.headers[FieldMember].value.(string) == "NameOwnerChanged" {
-				// fmt.Println(msg)
+			if d.signalCh != nil {
+				*d.signalCh <- msg
 			}
 		}
-
-		// fmt.Println()
 	}
 }
 
-func main() {
+func NewSession() (*Dbus, error) {
 	var (
 		address = os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 
@@ -84,12 +74,12 @@ func main() {
 	)
 
 	if t != "unix:path" {
-		panic("dubs addr in DBUS_SESSION_BUS_ADDRESS not supported")
+		return nil, errors.New("dubs addr in DBUS_SESSION_BUS_ADDRESS not supported")
 	}
 
 	C, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: path, Net: "unix"})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	dbus := Dbus{
@@ -99,43 +89,23 @@ func main() {
 		serial:  0,
 
 		replyChs: make(map[int]chan Msg),
+
+		signalCh: nil,
 	}
 
 	err = dbus.Auth()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	fmt.Println("connected")
 
 	go dbus.reader()
 	go dbus.writer()
 
 	msg := dbus.Call("org.freedesktop.DBus.Hello")
-	fmt.Println("name", string(msg.body))
-
-	msg = dbus.Call("org.freedesktop.DBus.ListNames")
-	a := ParseStringArray(msg.body)
-	for _, e := range a {
-		if strings.HasPrefix(e, "org.mpris.") {
-			fmt.Println(e)
-		}
+	if len(msg.body) < 6 {
+		return nil, errors.New("len of reply msg body for Hello is invalid")
 	}
-	msg = dbus.Call("org.freedesktop.DBus.GetNameOwner", WithBody([]byte("org.mpris.MediaPlayer2.spotify")))
-	fmt.Println(msg)
+	dbus.Name = string(msg.body[4 : len(msg.body)-1])
 
-	dbus.Call("org.freedesktop.DBus.AddMatch",
-		WithBody([]byte("type='signal',interface='org.freedesktop.DBus.Properties'")),
-	)
-	dbus.Call("org.freedesktop.DBus.AddMatch",
-		WithBody([]byte("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'")),
-	)
-
-	// msg = dbus.Call("org.mpris.MediaPlayer2.Player.PlayPause",
-	// 	WithPath("/org/mpris/MediaPlayer2"),
-	// 	// WithDest("org.mpris.MediaPlayer2.mpd"))
-	// WithDest("org.mpris.MediaPlayer2.vivaldi"))
-	// fmt.Println(msg)
-
-	fmt.Println("end")
-	select {}
+	return &dbus, nil
 }

@@ -1,4 +1,4 @@
-package main
+package dbus
 
 type HeaderField byte
 

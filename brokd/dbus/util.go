@@ -1,4 +1,4 @@
-package main
+package dbus
 
 import (
 	"bytes"
@@ -28,6 +28,10 @@ func WithFlags(flags byte) func(*Call) {
 	return func(c *Call) {
 		c.flags = flags
 	}
+}
+
+func (d *Dbus) SetSignalCh(ch *chan Msg) {
+	d.signalCh = ch
 }
 
 func (d *Dbus) getSerial() int {
