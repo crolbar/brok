@@ -6,16 +6,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/crolbar/brok/brokd/dbus"
 	"github.com/crolbar/brok/share"
-	"github.com/godbus/dbus"
 )
 
 const (
-	artUriKey = "mpris:artUrl: <"
-	artistKey = "xesam:artist: <"
-	titleKey  = "xesam:title: <"
-
-	idPrefix    = "org.mpris.MediaPlayer2."
 	idPrefixLen = len("org.mpris.MediaPlayer2.")
 )
 
@@ -36,7 +31,7 @@ type Player struct {
 }
 
 type M struct {
-	dbusConn *dbus.Conn
+	dbusConn *dbus.Dbus
 
 	listeningConns []*net.Conn
 
@@ -114,37 +109,43 @@ func (m *M) handleConn(conn net.Conn) {
 }
 
 func (m *M) dbusListener() {
-	call := m.dbusConn.BusObject().Call(
-		"org.freedesktop.DBus.AddMatch", 0,
-		"type='signal',interface='org.freedesktop.DBus.Properties'",
+	msg := m.dbusConn.Call(
+		"org.freedesktop.DBus.AddMatch",
+		dbus.WithBody([]byte("type='signal',interface='org.freedesktop.DBus.Properties'")),
 	)
-	if call.Err != nil {
-		panic(call.Err)
+	if msg.Type == dbus.MSG_ERROR {
+		panic(msg.String())
 	}
 
-	call = m.dbusConn.BusObject().Call(
-		"org.freedesktop.DBus.AddMatch", 0,
-		"type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'",
+	msg = m.dbusConn.Call(
+		"org.freedesktop.DBus.AddMatch",
+		dbus.WithBody([]byte("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'")),
 	)
-	if call.Err != nil {
-		panic(call.Err)
+	if msg.Type == dbus.MSG_ERROR {
+		panic(msg.String())
 	}
 
-	var sig_ch chan *dbus.Signal = make(chan *dbus.Signal)
-	m.dbusConn.Signal(sig_ch)
+	var sig_ch chan dbus.Msg = make(chan dbus.Msg, 1000)
+	m.dbusConn.SetSignalCh(&sig_ch)
 	for !m.quit {
 		sig := <-sig_ch
 
-		if sig == nil {
+		if sig.Type != dbus.MSG_SIGNAL {
+			panic("non signal in sig chan")
+		}
+
+		if sig.Headers[dbus.FieldPath].Value.(string) == "/org/freedesktop/DBus" &&
+			sig.Headers[dbus.FieldMember].Value.(string) == "NameOwnerChanged" {
+			m.handleNameOwnerChanged(sig.Body)
 			continue
 		}
 
-		if sig.Name == "org.freedesktop.DBus.NameOwnerChanged" {
-			m.handleNameOwnerChanged(sig.Body[0].(string))
+		if sig.Headers[dbus.FieldMember].Value.(string) != "PropertiesChanged" ||
+			sig.Headers[dbus.FieldPath].Value.(string) != "/org/mpris/MediaPlayer2" {
 			continue
 		}
 
-		sender := sig.Sender
+		sender := sig.Headers[dbus.FieldSender].Value.(string)
 		if !strings.HasPrefix(sender, "org.mpris.MediaPlayer2") {
 			var p string
 
@@ -163,8 +164,6 @@ func (m *M) dbusListener() {
 			}
 		}
 
-		// fmt.Printf("\x1b[34m[%s]\x1b[m %s\n", sender, sig.Body)
-
 		if sender == "org.mpris.MediaPlayer2.playerctld" {
 			continue
 		}
@@ -172,19 +171,12 @@ func (m *M) dbusListener() {
 		// on any action from this player, focus it
 		m.focusPlayer(sender)
 
-		if up := m.upPlayerProps(sender, sig.Body[1].(map[string]dbus.Variant)); up {
+		props := dbus.ParsePropertiesChanged(sig.Body)
+		if up := m.upPlayerProps(sender, props); up {
+			// fmt.Printf("\x1b[34m[%s]\x1b[m %s\n", sender, props)
 			m.writeToListeners()
+			// m.printPlayers()
 		}
-
-		/*
-			BODY:
-			[org.mpris.MediaPlayer2.Player map[PlaybackStatus:"Playing"] []]
-			[org.mpris.MediaPlayer2.Player map[PlaybackStatus:"Paused"] []]
-			[org.mpris.MediaPlayer2.Player map[Metadata:{"mpris:artUrl": <"...
-
-			[org.mpris.MediaPlayer2.firefox.instance_1_26] [org.mpris.MediaPlayer2.Player map[CanGoNext:false] []]
-			[org.mpris.MediaPlayer2.firefox.instance_1_26] [org.mpris.MediaPlayer2.Player map[CanGoPrevious:false] []]
-		*/
 	}
 }
 
@@ -198,12 +190,12 @@ func main() {
 		}
 	}
 
-	conn, err := dbus.SessionBus()
+	conn, err := dbus.NewSession()
 	if err != nil {
 		panic(err)
 	}
-	defer conn.Close()
-	fmt.Println("\x1b[34mConnected to dbus\x1b[m")
+	defer conn.C.Close()
+	fmt.Printf("\x1b[34mConnected to dbus (%s)\x1b[m\n", conn.Name)
 
 	listener, err := net.Listen("unix", share.SockPath)
 	if err != nil {
