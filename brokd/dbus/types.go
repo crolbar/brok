@@ -25,6 +25,13 @@ const (
 	MSG_SIGNAL
 )
 
+type MsgFlag byte
+
+const (
+	FLAG_NO_REPLY_EXPECTED MsgFlag = 1 << iota
+	FLAG_NO_AUTO_START
+)
+
 var headerMap = map[HeaderField]string{
 	0: "INVALID",
 	1: "PATH",
@@ -57,4 +64,13 @@ type Msg struct {
 
 	headers map[HeaderField]Variant
 	body    []byte
+}
+
+type Call struct {
+	serial int
+	flags  byte
+	method string
+	path   string
+	dest   string
+	body   []byte
 }
