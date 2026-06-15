@@ -25,7 +25,7 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 	sigLen := buf[i]
 	i += 1
 
-	h.sig = Signature{str: string(buf[i : i+int(sigLen)])}
+	h.Sig = Signature{Str: string(buf[i : i+int(sigLen)])}
 	i += int(sigLen) + // sig
 		1 // null term
 
@@ -35,7 +35,7 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 	case FieldReplySerial, FieldUnixFDs:
 		var v uint32
 		binary.Read(bytes.NewBuffer(buf[i:]), order, &v)
-		h.value = v
+		h.Value = v
 		i += 4
 
 	// string
@@ -52,7 +52,7 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 		var v = make([]byte, length)
 		binary.Read(bytes.NewBuffer(buf[i:]), order, &v)
 		i += int(length) + 1
-		h.value = string(v)
+		h.Value = string(v)
 
 		// skip the padding
 		if i%8 != 0 {
@@ -64,7 +64,7 @@ func readHeaders(buf []byte, order binary.ByteOrder, headers map[HeaderField]Var
 		i += 1
 
 		v := buf[i : i+int(length)]
-		h.value = v
+		h.Value = v
 		i += int(length) + 1
 
 		if i%8 != 0 {
@@ -118,7 +118,7 @@ func (d *Dbus) readMsg(fixedHeader [16]byte) Msg {
 
 	return Msg{
 		Type:    MsgType(fixedHeader[1]),
-		headers: headers,
-		body:    body,
+		Headers: headers,
+		Body:    body,
 	}
 }

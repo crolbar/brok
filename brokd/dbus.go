@@ -1,39 +1,47 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/crolbar/brok/brokd/dbus"
 )
 
-func (m *M) handleNameOwnerChanged(player string) {
+func (m *M) handleNameOwnerChanged(data []byte) {
+	var size uint32 = binary.LittleEndian.Uint32(data)
+	player := string(data[4 : 4+size])
+
 	if !strings.HasPrefix(player, "org.mpris.MediaPlayer2") {
-		fmt.Println("skip")
 		return
 	}
+	fmt.Println("up", player)
 
 	if v, ok := m.playersIDsMap[player]; ok {
 		delete(m.playersIDsMap, player)
 		delete(m.playersIDsMap, v)
 
-		// fmt.Printf("\x1b[34mdel player: %s\x1b[m\n", player)
+		fmt.Printf("\x1b[34mdel player: %s\x1b[m\n", player)
 	} else {
-		// fmt.Printf("\x1b[34mnew player: %s\x1b[m\n", player)
+		fmt.Printf("\x1b[34mnew player: %s\x1b[m\n", player)
 	}
 
 	m.upPlayers()
+	m.writeToListeners()
 }
 
 func (m *M) getPlayerName(sender string) string {
 	for _, player := range m.playersOrder {
-		var owner string
-		fmt.Println("call with", player)
-		err := m.dbusConn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, player).Store(&owner)
-		if err != nil {
-			fmt.Println("err: ", err)
+		msg := m.dbusConn.Call("org.freedesktop.DBus.GetNameOwner",
+			dbus.WithBody([]byte(player)),
+		)
+		owner := string(msg.Body[4 : len(msg.Body)-1])
+
+		if msg.Type == dbus.MSG_ERROR {
+			fmt.Println("err: ", msg)
 			continue
 		}
-		fmt.Println("owner", player)
 
 		if owner == sender {
 			return player
@@ -45,10 +53,12 @@ func (m *M) getPlayerName(sender string) string {
 
 func (m *M) upPlayers() {
 	var names []string
-	err := m.dbusConn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
-	if err != nil {
-		panic("Failed to get list of owned names: " + err.Error())
+	msg := m.dbusConn.Call("org.freedesktop.DBus.ListNames")
+	if msg.Type == dbus.MSG_ERROR {
+		panic("Failed to get list of owned names: " + msg.String())
 	}
+
+	names = dbus.ParseStringArray(msg.Body)
 
 	// fmt.Println("Currently owned names on the session bus:")
 	// for _, v := range names {

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 
-	"github.com/godbus/dbus"
+	"github.com/crolbar/brok/brokd/dbus"
 )
 
 func (m *M) focusPlayer(id string) {
@@ -101,24 +102,36 @@ func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) bool {
 	haveUpdate := false
 	for k, v := range props {
 		event := strings.ReplaceAll(k, "\"", "")
-		value := strings.ReplaceAll(v.String(), "\"", "")
 
-		if event == "PlaybackStatus" {
-			switch value {
-			case "Playing":
-				// player.status = Playing
-				upIfNE(&player.status, Playing, &haveUpdate)
-			case "Stopped":
-				fallthrough
-			case "Paused":
-				upIfNE(&player.status, Paused, &haveUpdate)
+		switch event {
+		case "PlaybackStatus":
+			{
+				value := strings.ReplaceAll(v.Value.(string), "\"", "")
+				switch value {
+				case "Playing":
+					// player.status = Playing
+					upIfNE(&player.status, Playing, &haveUpdate)
+				case "Stopped":
+					fallthrough
+				case "Paused":
+					upIfNE(&player.status, Paused, &haveUpdate)
+				}
 			}
-		}
 
-		if event == "Metadata" {
-			upIfNE(&player.artUri, getMetadataVal(artUriKey, value), &haveUpdate)
-			upIfNE(&player.title, getMetadataVal(titleKey, value), &haveUpdate)
-			upIfNE(&player.artist, getMetadataVal(artistKey, value), &haveUpdate)
+		case "Metadata":
+			{
+				value := v.Value.(map[string]dbus.Variant)
+
+				if vari, ok := value["mpris:artUrl"]; ok {
+					upIfNE(&player.artUri, vari.Value.(string), &haveUpdate)
+				}
+				if vari, ok := value["xesam:title"]; ok {
+					upIfNE(&player.title, vari.Value.(string), &haveUpdate)
+				}
+				if vari, ok := value["xesam:artist"]; ok {
+					upIfNE(&player.artist, vari.Value.([]string)[0], &haveUpdate)
+				}
+			}
 		}
 	}
 
@@ -129,7 +142,9 @@ func (m *M) writeToListeners() {
 	if len(m.listeningConns) != 0 {
 		json := m.getPlayersJson()
 		for _, conn := range m.listeningConns {
-			(*conn).Write(append(getUint16Bytes(uint16(len(json))), []byte(json)...))
+			size := make([]byte, 2)
+			binary.LittleEndian.PutUint16(size, uint16(len(json)))
+			(*conn).Write(append(size, []byte(json)...))
 		}
 	}
 }
@@ -137,10 +152,12 @@ func (m *M) writeToListeners() {
 func (m *M) next(pIDX int) {
 	pID := m.playersOrder[pIDX]
 
-	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
-	call := obj.Call("org.mpris.MediaPlayer2.Player.Next", 0)
-	if call.Err != nil {
-		fmt.Println(call.Err)
+	msg := m.dbusConn.Call("org.mpris.MediaPlayer2.Player.Next",
+		dbus.WithDest(pID),
+		dbus.WithPath("/org/mpris/MediaPlayer2"),
+	)
+	if msg.Type == dbus.MSG_ERROR {
+		panic(msg.String())
 	}
 
 	if pIDX != 0 {
@@ -151,10 +168,12 @@ func (m *M) next(pIDX int) {
 func (m *M) prev(pIDX int) {
 	pID := m.playersOrder[pIDX]
 
-	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
-	call := obj.Call("org.mpris.MediaPlayer2.Player.Previous", 0)
-	if call.Err != nil {
-		fmt.Println(call.Err)
+	msg := m.dbusConn.Call("org.mpris.MediaPlayer2.Player.Previous",
+		dbus.WithDest(pID),
+		dbus.WithPath("/org/mpris/MediaPlayer2"),
+	)
+	if msg.Type == dbus.MSG_ERROR {
+		panic(msg.String())
 	}
 
 	if pIDX != 0 {
@@ -165,10 +184,12 @@ func (m *M) prev(pIDX int) {
 func (m *M) playPause(pIDX int) {
 	pID := m.playersOrder[pIDX]
 
-	obj := m.dbusConn.Object(pID, "/org/mpris/MediaPlayer2")
-	call := obj.Call("org.mpris.MediaPlayer2.Player.PlayPause", 0)
-	if call.Err != nil {
-		fmt.Println(call.Err)
+	msg := m.dbusConn.Call("org.mpris.MediaPlayer2.Player.PlayPause",
+		dbus.WithDest(pID),
+		dbus.WithPath("/org/mpris/MediaPlayer2"),
+	)
+	if msg.Type == dbus.MSG_ERROR {
+		panic(msg.String())
 	}
 
 	if pIDX != 0 {

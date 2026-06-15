@@ -13,9 +13,9 @@ func writeHeader(buf *bytes.Buffer, h header) {
 	buf.WriteByte(byte(h.Field))
 
 	// SIG
-	buf.WriteByte(byte(len(h.sig.str))) // len of sig
-	b := make([]byte, len(h.sig.str)+1)
-	copy(b, h.sig.str)
+	buf.WriteByte(byte(len(h.Sig.Str))) // len of sig
+	b := make([]byte, len(h.Sig.Str)+1)
+	copy(b, h.Sig.Str)
 	b[len(b)-1] = 0 // null terminate sig
 	buf.Write(b)
 
@@ -27,7 +27,7 @@ func writeHeader(buf *bytes.Buffer, h header) {
 		FieldErrorName,
 		FieldDestination,
 		FieldPath:
-		v := h.value.(string)
+		v := h.Value.(string)
 		binary.Write(buf, binary.LittleEndian, uint32(len(v)))
 		b := make([]byte, len(v)+1)
 		copy(b, v)
@@ -35,7 +35,7 @@ func writeHeader(buf *bytes.Buffer, h header) {
 		buf.Write(b)
 
 	case FieldSignature:
-		v := h.value.(string)
+		v := h.Value.(string)
 		if len(v) > 254 {
 			panic("len of sig long")
 		}
@@ -68,11 +68,11 @@ func (d *Dbus) makeCall(c Call) Msg {
 		}
 
 		headers = []header{
-			{Field: FieldPath, Variant: Variant{value: c.path, sig: Signature{str: "o"}}},
-			{Field: FieldDestination, Variant: Variant{value: c.dest, sig: Signature{str: "s"}}},
+			{Field: FieldPath, Variant: Variant{Value: c.path, Sig: Signature{Str: "o"}}},
+			{Field: FieldDestination, Variant: Variant{Value: c.dest, Sig: Signature{Str: "s"}}},
 
-			{Field: FieldMember, Variant: Variant{value: c.method, sig: Signature{str: "s"}}},
-			{Field: FieldInterface, Variant: Variant{value: iface, sig: Signature{str: "s"}}},
+			{Field: FieldMember, Variant: Variant{Value: c.method, Sig: Signature{Str: "s"}}},
+			{Field: FieldInterface, Variant: Variant{Value: iface, Sig: Signature{Str: "s"}}},
 		}
 
 		// we need the len of the headers in bytes, this is the easiest way
@@ -88,7 +88,7 @@ func (d *Dbus) makeCall(c Call) Msg {
 		headers = append(headers, header{
 			Field: FieldSignature,
 			// TODO: fixed value just for strings, change if needed for other types in body
-			Variant: Variant{value: "s", sig: Signature{str: "g"}},
+			Variant: Variant{Value: "s", Sig: Signature{Str: "g"}},
 		})
 	}
 

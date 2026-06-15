@@ -42,13 +42,13 @@ func (d *Dbus) getSerial() int {
 func (m Msg) String() string {
 	var sb strings.Builder
 
-	if m.headers == nil {
+	if m.Headers == nil {
 		return "empty msg"
 	}
 
 	sb.WriteString(fmt.Sprintf("Msg: %d\n", m.Type))
 	sb.WriteString("  Headers:\n")
-	for k, v := range m.headers {
+	for k, v := range m.Headers {
 		sb.WriteString("    [")
 		switch k {
 		case FieldPath:
@@ -71,26 +71,26 @@ func (m Msg) String() string {
 			sb.WriteString("FieldUnixFDs")
 		}
 		sb.WriteString(", ")
-		sb.WriteString(fmt.Sprintf("%q", v.value))
+		sb.WriteString(fmt.Sprintf("%q", v.Value))
 		// sb.WriteString(fmt.Sprintf("%s", v.sig))
 		sb.WriteString("]\n")
 	}
 
-	if sig, ok := m.headers[FieldSignature]; ok && len(sig.value.([]uint8)) > 0 {
-		switch string(m.headers[FieldSignature].value.([]uint8)[0]) {
+	if sig, ok := m.Headers[FieldSignature]; ok && len(sig.Value.([]uint8)) > 0 {
+		switch string(m.Headers[FieldSignature].Value.([]uint8)[0]) {
 		case "s":
-			sb.WriteString(fmt.Sprintf("  Body: %s", string(m.body)))
+			sb.WriteString(fmt.Sprintf("  Body: %s", string(m.Body)))
 		case "b":
-			if m.body[0] == 0 {
+			if m.Body[0] == 0 {
 				sb.WriteString("  Body: false")
 			} else {
 				sb.WriteString("  Body: true")
 			}
 		default:
-			sb.WriteString(fmt.Sprintf("  Body: %v", m.body))
+			sb.WriteString(fmt.Sprintf("  Body: %v", m.Body))
 		}
 	} else {
-		sb.WriteString(fmt.Sprintf("  Body: %v", m.body))
+		sb.WriteString(fmt.Sprintf("  Body: %v", m.Body))
 	}
 
 	return sb.String()
@@ -238,7 +238,7 @@ func ParseArrayStringVariant(data []byte) map[string]Variant {
 		// fmt.Println()
 		// fmt.Println()
 
-		m[prop] = Variant{sig: Signature{sig}, value: value}
+		m[prop] = Variant{Sig: Signature{sig}, Value: value}
 	}
 
 	return m

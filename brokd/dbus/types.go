@@ -46,12 +46,12 @@ var headerMap = map[HeaderField]string{
 }
 
 type Signature struct {
-	str string
+	Str string
 }
 
 type Variant struct {
-	sig   Signature
-	value any
+	Sig   Signature
+	Value any
 }
 
 type header struct {
@@ -62,8 +62,8 @@ type header struct {
 type Msg struct {
 	Type MsgType
 
-	headers map[HeaderField]Variant
-	body    []byte
+	Headers map[HeaderField]Variant
+	Body    []byte
 }
 
 type Call struct {

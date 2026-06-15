@@ -44,11 +44,12 @@ func (d *Dbus) reader() {
 		}
 		msg := d.readMsg(fixedHeader)
 
+		// fmt.Println(msg)
 		// send the msg back to the reply chan
 		switch msg.Type {
 		case MSG_METHOD_RETURN, MSG_ERROR:
-			if _, ok := msg.headers[FieldReplySerial]; ok {
-				replySerial := int(msg.headers[FieldReplySerial].value.(uint32))
+			if _, ok := msg.Headers[FieldReplySerial]; ok {
+				replySerial := int(msg.Headers[FieldReplySerial].Value.(uint32))
 
 				d.replyChMu.Lock()
 				replyCh := d.replyChs[replySerial]
@@ -102,10 +103,10 @@ func NewSession() (*Dbus, error) {
 	go dbus.writer()
 
 	msg := dbus.Call("org.freedesktop.DBus.Hello")
-	if len(msg.body) < 6 {
+	if len(msg.Body) < 6 {
 		return nil, errors.New("len of reply msg body for Hello is invalid")
 	}
-	dbus.Name = string(msg.body[4 : len(msg.body)-1])
+	dbus.Name = string(msg.Body[4 : len(msg.Body)-1])
 
 	return &dbus, nil
 }
