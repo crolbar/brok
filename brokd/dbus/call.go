@@ -52,6 +52,7 @@ func writeHeader(buf *bytes.Buffer, h header) {
 	}
 }
 
+// TODO: BODY SUPPORTS ONLY SINGLE STRING
 func (d *Dbus) makeCall(c Call) Msg {
 	iface := ""
 	i := strings.LastIndex(c.method, ".")

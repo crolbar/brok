@@ -42,17 +42,34 @@ func (d *Dbus) reader() {
 		msg := d.readMsg(fixedHeader)
 
 		// send the msg back to the reply chan
-		if _, ok := msg.headers[FieldReplySerial]; ok {
-			replySerial := int(msg.headers[FieldReplySerial].value.(uint32))
+		switch msg.Type {
+		case MSG_METHOD_RETURN, MSG_ERROR:
+			if _, ok := msg.headers[FieldReplySerial]; ok {
+				replySerial := int(msg.headers[FieldReplySerial].value.(uint32))
 
-			d.replyChMu.Lock()
-			replyCh := d.replyChs[replySerial]
-			d.replyChMu.Unlock()
+				d.replyChMu.Lock()
+				replyCh := d.replyChs[replySerial]
+				d.replyChMu.Unlock()
 
-			replyCh <- msg
+				replyCh <- msg
+			}
+		case MSG_SIGNAL:
+
+			// mpris update (sig sa{sv}as)
+			if msg.headers[FieldPath].value.(string) == "/org/mpris/MediaPlayer2" {
+				// fmt.Println(msg)
+				props := ParsePropertiesChanged(msg.body)
+
+				sender := msg.headers[FieldSender].value.(string)
+				fmt.Println(sender, props)
+			}
+			// client created/destoryed
+			if msg.headers[FieldPath].value.(string) == "/org/freedesktop/DBus" &&
+				msg.headers[FieldMember].value.(string) == "NameOwnerChanged" {
+				// fmt.Println(msg)
+			}
 		}
 
-		// fmt.Println(msg)
 		// fmt.Println()
 	}
 }
@@ -96,15 +113,27 @@ func main() {
 	msg := dbus.Call("org.freedesktop.DBus.Hello")
 	fmt.Println("name", string(msg.body))
 
-	msg = dbus.Call("org.freedesktop.DBus.Peer.Ping")
+	msg = dbus.Call("org.freedesktop.DBus.ListNames")
+	a := ParseStringArray(msg.body)
+	for _, e := range a {
+		if strings.HasPrefix(e, "org.mpris.") {
+			fmt.Println(e)
+		}
+	}
+	msg = dbus.Call("org.freedesktop.DBus.GetNameOwner", WithBody([]byte("org.mpris.MediaPlayer2.spotify")))
 	fmt.Println(msg)
 
-	msg = dbus.Call("org.freedesktop.DBus.GetId")
-	fmt.Println(msg)
+	dbus.Call("org.freedesktop.DBus.AddMatch",
+		WithBody([]byte("type='signal',interface='org.freedesktop.DBus.Properties'")),
+	)
+	dbus.Call("org.freedesktop.DBus.AddMatch",
+		WithBody([]byte("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'")),
+	)
 
 	// msg = dbus.Call("org.mpris.MediaPlayer2.Player.PlayPause",
 	// 	WithPath("/org/mpris/MediaPlayer2"),
-	// 	WithDest("org.mpris.MediaPlayer2.vivaldi.instance4043"))
+	// 	// WithDest("org.mpris.MediaPlayer2.mpd"))
+	// WithDest("org.mpris.MediaPlayer2.vivaldi"))
 	// fmt.Println(msg)
 
 	fmt.Println("end")
