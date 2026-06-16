@@ -47,7 +47,14 @@ func (m *M) printPlayers() {
 func (m *M) getPlayersJson() string {
 	var sb strings.Builder
 
-	sb.WriteByte('[')
+	sb.WriteByte('{')
+
+	sb.WriteString(fmt.Sprintf("\"brokctl-update\":\"%s\",", m.brokctlUpdate))
+	if len(m.brokctlUpdate) > 0 {
+		m.brokctlUpdate = ""
+	}
+
+	sb.WriteString("\"players\":[")
 	for i, pID := range m.playersOrder {
 		p := m.players[pID]
 
@@ -73,6 +80,7 @@ func (m *M) getPlayersJson() string {
 		}
 	}
 	sb.WriteByte(']')
+	sb.WriteByte('}')
 
 	return sb.String()
 }
@@ -163,6 +171,7 @@ func (m *M) next(pIDX int) {
 	if pIDX != 0 {
 		m.focusPlayer(pID)
 	}
+	m.brokctlUpdate = BROKCTL_UPDATE_NEXT
 }
 
 func (m *M) prev(pIDX int) {
@@ -179,6 +188,7 @@ func (m *M) prev(pIDX int) {
 	if pIDX != 0 {
 		m.focusPlayer(pID)
 	}
+	m.brokctlUpdate = BROKCTL_UPDATE_PREV
 }
 
 func (m *M) playPause(pIDX int) {
@@ -195,4 +205,5 @@ func (m *M) playPause(pIDX int) {
 	if pIDX != 0 {
 		m.focusPlayer(pID)
 	}
+	m.brokctlUpdate = BROKCTL_UPDATE_PLAY_PAUSE
 }

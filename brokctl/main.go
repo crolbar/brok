@@ -72,6 +72,10 @@ func (m *M) listener() {
 	}
 }
 
+// TODO:
+// help msg
+// focus next/prev
+
 func main() {
 	conn, err := net.Dial("unix", share.SockPath)
 	if err != nil {

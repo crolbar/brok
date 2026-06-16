@@ -30,20 +30,29 @@ type Player struct {
 	artist string
 }
 
+const (
+	BROKCTL_UPDATE_NEXT         = "next"
+	BROKCTL_UPDATE_PREV         = "prev"
+	BROKCTL_UPDATE_PLAY_PAUSE   = "play-pause"
+	BROKCTL_UPDATE_FOCUS_CHANGE = "focus-changed"
+)
+
 type M struct {
 	dbusConn *dbus.Dbus
 
+	listener       net.Listener
 	listeningConns []*net.Conn
 
 	// key == player.id
 	players map[string]*Player
 	// playersOrder[0] is the focused player, 1, 2 are in order below it
 	playersOrder []string
-
 	// used for caching id maps
 	playersIDsMap map[string]string
 
-	listener net.Listener
+	// indicates that we have recived a msg from brokctl, also what msg it was
+	// will be send in the next write to the listeners
+	brokctlUpdate string
 
 	quit bool
 }
@@ -71,6 +80,7 @@ func (m *M) handleMsg(msg string, conn *net.Conn) {
 			m.focusPlayer(pID)
 
 			(*conn).Write([]byte("ok"))
+			m.brokctlUpdate = BROKCTL_UPDATE_FOCUS_CHANGE
 		} else {
 			(*conn).Write([]byte("incorrect id, id is not in players"))
 		}
