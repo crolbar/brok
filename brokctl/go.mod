@@ -2,4 +2,4 @@ module github.com/crolbar/brok/brokctl
 
 go 1.24.4
 
-require github.com/crolbar/brok/share v0.0.0-20260615215119-23bb0dd4c7ef
+require github.com/crolbar/brok/share v0.0.0-20260707081748-81c5b900a680

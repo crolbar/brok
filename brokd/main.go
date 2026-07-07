@@ -66,6 +66,9 @@ func (m *M) handleMsg(msg string, conn *net.Conn) {
 	case share.MSG_PLAY_PAUSE:
 		m.playPause(0)
 
+	case share.MSG_REQ_UP:
+		m.writePlayersTo(conn)
+
 	case share.MSG_SUB:
 		m.listeningConns = append(m.listeningConns, conn)
 

@@ -19,14 +19,14 @@
         pname = "brokd";
         version = "v0.1";
         src = ./brokd;
-        vendorHash = "sha256-tH8eTuuOQWvp8cZTCyPXgxcfG6E9cA8/WC29U/X4zCQ=";
+        vendorHash = "sha256-FoygaINJtbogFdYrQlOSnYn7beFoIzw6pMK24w4NRFU=";
       };
 
       brokctl = pkgs.buildGoModule {
         pname = "brokctl";
         version = "v0.1";
         src = ./brokctl;
-        vendorHash = "sha256-tH8eTuuOQWvp8cZTCyPXgxcfG6E9cA8/WC29U/X4zCQ=";
+        vendorHash = "sha256-nHv2uYn5KMFlIeGGdQ2FIh4516LB24cIkXrrRHkLdmg=";
       };
     };
 

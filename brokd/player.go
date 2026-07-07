@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/crolbar/brok/brokd/dbus"
@@ -155,6 +156,13 @@ func (m *M) writeToListeners() {
 			(*conn).Write(append(size, []byte(json)...))
 		}
 	}
+}
+
+func (m *M) writePlayersTo(conn *net.Conn) {
+	json := m.getPlayersJson()
+	size := make([]byte, 2)
+	binary.LittleEndian.PutUint16(size, uint16(len(json)))
+	(*conn).Write(append(size, []byte(json)...))
 }
 
 func (m *M) next(pIDX int) {

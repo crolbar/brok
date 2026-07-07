@@ -45,31 +45,35 @@ func (m *M) sendFocusMsg(id string) {
 
 func (m *M) listener() {
 	for {
-		headerBuf := make([]byte, 2)
-		n, err := m.conn.Read(headerBuf)
-		if err != nil {
-			panic(err)
-		}
-		if n != 2 {
-			panic("no 2 byte header")
-		}
-
-		size := binary.LittleEndian.Uint16(headerBuf)
-
-		buf := make([]byte, size)
-		n, err = m.conn.Read(buf)
-		if err != nil {
-			panic(err)
-		}
-
-		if n != int(size) {
-			panic("incorrect size of body send from server")
-		}
-
-		data := buf[:n]
-
-		fmt.Println(string(data))
+		m.readOne()
 	}
+}
+
+func (m *M) readOne() {
+	headerBuf := make([]byte, 2)
+	n, err := m.conn.Read(headerBuf)
+	if err != nil {
+		panic(err)
+	}
+	if n != 2 {
+		panic("no 2 byte header")
+	}
+
+	size := binary.LittleEndian.Uint16(headerBuf)
+
+	buf := make([]byte, size)
+	n, err = m.conn.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+
+	if n != int(size) {
+		panic("incorrect size of body send from server")
+	}
+
+	data := buf[:n]
+
+	fmt.Println(string(data))
 }
 
 // TODO:
@@ -106,8 +110,26 @@ func main() {
 			m.sendMsg(share.MSG_SUB)
 			m.listener()
 
+		case "ru", "--request-update":
+			m.sendMsg(share.MSG_REQ_UP)
+			m.readOne()
+
 		case "quit":
 			m.sendMsg("quit")
+		case "help", "--help", "-h":
+			fmt.Println("\n" +
+				"Usage: brokctl [OPTIONS..]" +
+				"\n" +
+				"[OPTIONS]" +
+				"next, --next                send next call" +
+				"prev, --prev                send previous call" +
+				"play-pause, --play-pause    send play-pause call" +
+				"focus, --focus [id]         move the player with id to the front" +
+				"sub, subscribe, --subscribe listen for changes in mpris" +
+				"ru, --request-update        forces brok to write current players back" +
+				"")
+			return
+
 		default:
 			continue
 		}

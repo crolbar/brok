@@ -9,6 +9,8 @@ const (
 	MSG_PREV = "prev"
 	MSG_PLAY_PAUSE = "playpause"
 	MSG_SUB = "sub"
+	MSG_REQ_UP = "requp"
+
 
 	MSG_FOCUS = "focus"
 	MSG_FOCUS_LEN = len(MSG_FOCUS)
