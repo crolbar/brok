@@ -19,7 +19,7 @@
         pname = "brokd";
         version = "v0.1";
         src = ./brokd;
-        vendorHash = "sha256-FoygaINJtbogFdYrQlOSnYn7beFoIzw6pMK24w4NRFU=";
+        vendorHash = "sha256-nHv2uYn5KMFlIeGGdQ2FIh4516LB24cIkXrrRHkLdmg=";
       };
 
       brokctl = pkgs.buildGoModule {
