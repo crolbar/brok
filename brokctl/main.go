@@ -77,10 +77,28 @@ func (m *M) readOne() {
 }
 
 // TODO:
-// help msg
 // focus next/prev
 
+func printHelp() {
+	fmt.Println("\n" +
+		"Usage: brokctl [OPTIONS..]" + "\n\n" +
+		"[OPTIONS]" + "\n" +
+		"next, --next                   send next call" + "\n" +
+		"prev, --prev                   send previous call" + "\n" +
+		"play-pause, --play-pause       send play-pause call" + "\n" +
+		"focus, --focus [id]            move the player with id to the front" + "\n" +
+		"sub, subscribe, --subscribe    listen for changes in mpris, and get players in json" + "\n" +
+		"ru, --request-update           get the current players without waiting for update (can be combined with sub i.e. `brokctl ru sub`)")
+}
+
 func main() {
+	for _, arg := range os.Args {
+		if arg == "help" || arg == "--help" || arg == "-h" {
+			printHelp()
+			return
+		}
+	}
+
 	conn, err := net.Dial("unix", share.SockPath)
 	if err != nil {
 		panic(err)
@@ -88,7 +106,6 @@ func main() {
 
 	m := M{conn: conn}
 
-	noArgs := true
 	for i, arg := range os.Args {
 		switch arg {
 		case "next", "--next":
@@ -116,27 +133,13 @@ func main() {
 
 		case "quit":
 			m.sendMsg("quit")
-		case "help", "--help", "-h":
-			fmt.Println("\n" +
-				"Usage: brokctl [OPTIONS..]" +
-				"\n" +
-				"[OPTIONS]" +
-				"next, --next                send next call" +
-				"prev, --prev                send previous call" +
-				"play-pause, --play-pause    send play-pause call" +
-				"focus, --focus [id]         move the player with id to the front" +
-				"sub, subscribe, --subscribe listen for changes in mpris" +
-				"ru, --request-update        forces brok to write current players back" +
-				"")
-			return
-
 		default:
 			continue
 		}
-		noArgs = false
 	}
 
-	if noArgs {
-		fmt.Println("\x1b[31mNo arg provided\x1b[m")
+	if len(os.Args) <= 1 {
+		printHelp()
+		return
 	}
 }
