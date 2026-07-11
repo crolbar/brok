@@ -253,7 +253,16 @@ func ParsePropertiesChanged(data []byte) map[string]Variant {
 	interName := string(data[i : i+int(interNameLen)])
 	i += int(interNameLen)
 	if interName != "org.mpris.MediaPlayer2.Player" {
-		panic("signal PropertiesChanged not comming from mpris player?")
+		fmt.Println("\x1b[31msignal PropertiesChanged not comming from unsupported player: ", interName, "\x1b[m")
+
+		return map[string]Variant{
+			"Metadata": {
+				Sig: Signature{Str: "a{sv}"},
+				Value: map[string]Variant{
+					"xesam:title": {Sig: Signature{Str: "s"}, Value: "Unsupported player"},
+				},
+			},
+		}
 	}
 
 	if i%4 != 0 {

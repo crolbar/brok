@@ -106,6 +106,10 @@ func upIfNE[T string | int](curr *T, new T, up *bool) {
 }
 
 func (m *M) upPlayerProps(pID string, props map[string]dbus.Variant) bool {
+	if len(props) == 0 {
+		fmt.Println("empty")
+		return false
+	}
 	player := m.players[pID]
 
 	if len(player.name) == 0 {
