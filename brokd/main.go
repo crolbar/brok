@@ -238,7 +238,7 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Printf("\x1b[34mAccepted conn from addr: %s\x1b[m\n", conn.LocalAddr().String())
+		// fmt.Printf("\x1b[34mAccepted conn from addr: %s\x1b[m\n", conn.LocalAddr().String())
 
 		go m.handleConn(conn)
 	}

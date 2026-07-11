@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -26,6 +27,7 @@ func (m *M) deletePlayerInOrder(id string) {
 	for i, _id := range m.playersOrder {
 		if _id == id {
 			m.playersOrder = append(m.playersOrder[:i], m.playersOrder[i+1:]...)
+			return
 		}
 	}
 }
@@ -45,12 +47,22 @@ func (m *M) printPlayers() {
 	fmt.Println()
 }
 
+func marshalString(s string) string {
+	out, err := json.Marshal(s)
+	if err != nil {
+		fmt.Println("\x1b[31mError while marshling title\x1b[m")
+		return s
+	}
+	return string(out)
+}
+
 func (m *M) getPlayersJson() string {
 	var sb strings.Builder
 
 	sb.WriteByte('{')
 
-	sb.WriteString(fmt.Sprintf("\"brokctl-update\":\"%s\",", m.brokctlUpdate))
+	sb.WriteString(`"brokctl-update":"` + m.brokctlUpdate + `",`)
+
 	if len(m.brokctlUpdate) > 0 {
 		m.brokctlUpdate = ""
 	}
@@ -59,22 +71,20 @@ func (m *M) getPlayersJson() string {
 	for i, pID := range m.playersOrder {
 		p := m.players[pID]
 
-		sb.WriteString(fmt.Sprintf(
-			"{"+
-				`"id":"%s",`+
-				`"name":"%s",`+
-				`"status":%d,`+
-				`"title":"%s",`+
-				`"artist":"%s",`+
-				`"artUri":"%s"`+
-				"}",
-			p.id,
-			p.name,
-			p.status,
-			p.title,
-			p.artist,
-			p.artUri,
-		))
+		sb.WriteByte('{')
+
+		sb.WriteString(`"id":"` + p.id + `",`)
+		sb.WriteString(`"name":"` + p.name + `",`)
+
+		sb.WriteString(`"status":`)
+		sb.WriteRune('0' + rune(p.status))
+		sb.WriteByte(',')
+
+		sb.WriteString(`"title":` + marshalString(p.title) + `,`)
+		sb.WriteString(`"artist":` + marshalString(p.artist) + `,`)
+		sb.WriteString(`"artUri":` + marshalString(p.artUri))
+
+		sb.WriteByte('}')
 
 		if i != len(m.playersOrder)-1 {
 			sb.WriteByte(',')
